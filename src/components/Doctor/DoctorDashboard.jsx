@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useContext } from "react";
-import { AuthContext } from "../../contexts/AuthContext";
-import { getAuth } from "firebase/auth";
+import React, { useState, useEffect } from "react";
+import { getAuth, signOut } from "firebase/auth";
 import {
   collection,
   getDocs,
+  doc,
+  getDoc,
   query,
   where,
 } from "firebase/firestore";
@@ -13,12 +14,8 @@ import { Plus, LogOut, Users } from "lucide-react";
 import PatientList from "./PatientList";
 import AddPatientForm from "./AddPatientForm";
 import styles from "./Doctor.module.css";
-import { signOut } from "firebase/auth";
-
-const API_BASE = "http://127.0.0.1:8000";
 
 export default function DoctorDashboard() {
-  
   const auth = getAuth();
 
   const [activeTab, setActiveTab] = useState("patients");
@@ -26,23 +23,32 @@ export default function DoctorDashboard() {
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Fetch doctor's own Firestore profile
   const fetchDoctorProfile = async (user) => {
-    const q = query(collection(db, "doctors"), where("uid", "==", user.uid));
-    const snapshot = await getDocs(q);
+    const doctorRef = doc(db, "doctors", user.uid);
+    const doctorDoc = await getDoc(doctorRef);
 
-    if (!snapshot.empty) {
-      const doc = snapshot.docs[0];
-      setDoctorInfo({ id: doc.id, ...doc.data() });
+    if (doctorDoc.exists()) {
+      setDoctorInfo({ id: doctorDoc.id, ...doctorDoc.data() });
     }
   };
 
-  // 🔹 Fetch patients linked to this doctor
   const fetchMyPatients = async (doctorId) => {
-    const q = query(collection(db, "patients"), where("doctorId", "==", doctorId));
-    const snapshot = await getDocs(q);
-    const pts = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    setPatients(pts);
+    try {
+      const subCollectionRef = collection(db, "doctors", doctorId, "patients");
+      const subCollectionSnapshot = await getDocs(subCollectionRef);
+      let patientData = subCollectionSnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      if (!patientData.length) {
+        const legacyQuery = query(collection(db, "patients"), where("doctorId", "==", doctorId));
+        const legacySnapshot = await getDocs(legacyQuery);
+        patientData = legacySnapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      }
+
+      setPatients(patientData);
+    } catch (error) {
+      console.error("Failed to fetch doctor patients:", error);
+      setPatients([]);
+    }
   };
 
   const handlePatientAdded = async () => {
@@ -51,22 +57,23 @@ export default function DoctorDashboard() {
     setActiveTab("patients");
   };
 
-  
-
-const handleLogout = async () => {
-  const authInstance = getAuth();
-  await signOut(authInstance);
-  window.location.href = "/login";
-};
-
+  const handleLogout = async () => {
+    await signOut(auth);
+    window.location.href = "/login";
+  };
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (!user) return;
 
-      await fetchDoctorProfile(user);
-      await fetchMyPatients(user.uid);
-      setLoading(false);
+      try {
+        await fetchDoctorProfile(user);
+        await fetchMyPatients(user.uid);
+        setLoading(false);
+      } catch (error) {
+        console.error("DOCTOR DASHBOARD ERROR:", error);
+        setLoading(false);
+      }
     });
 
     return () => unsubscribe();
@@ -76,7 +83,6 @@ const handleLogout = async () => {
 
   return (
     <div className={styles.dashboardContainer}>
-      {/* HEADER */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <h1>Doctor Dashboard</h1>
@@ -95,12 +101,9 @@ const handleLogout = async () => {
         </button>
       </header>
 
-      {/* TABS */}
       <nav className={styles.tabNav}>
         <button
-          className={`${styles.tabBtn} ${
-            activeTab === "patients" ? styles.active : ""
-          }`}
+          className={`${styles.tabBtn} ${activeTab === "patients" ? styles.active : ""}`}
           onClick={() => setActiveTab("patients")}
         >
           <Users size={18} />
@@ -108,9 +111,7 @@ const handleLogout = async () => {
         </button>
 
         <button
-          className={`${styles.tabBtn} ${
-            activeTab === "add" ? styles.active : ""
-          }`}
+          className={`${styles.tabBtn} ${activeTab === "add" ? styles.active : ""}`}
           onClick={() => setActiveTab("add")}
         >
           <Plus size={18} />
@@ -118,15 +119,12 @@ const handleLogout = async () => {
         </button>
       </nav>
 
-      {/* MAIN CONTENT */}
       <main className={styles.mainContent}>
-        {activeTab === "patients" && (
-          <PatientList patients={patients} />
-        )}
+        {activeTab === "patients" && <PatientList patients={patients} />}
 
         {activeTab === "add" && (
           <AddPatientForm
-            doctorId={auth.currentUser.uid}
+            doctorId={auth.currentUser?.uid}
             onSuccess={handlePatientAdded}
           />
         )}

@@ -57,22 +57,39 @@ const LoginPage = () => {
 
         {error && <div className={styles.error}>{error}</div>}
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          
+        <form onSubmit={handleSubmit} className={styles.form} noValidate>
 
-          <div className={styles.formGroup}>
-            <label>Email</label>
+          <div className={`${styles.formGroup} ${email ? 'filled' : ''}`}>
             <div className={styles.inputWrapper}>
-              <Mail size={18} />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Mail size={18} aria-hidden="true" />
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder=" "
+                required
+                aria-required="true"
+              />
+              <label htmlFor="email">Email</label>
             </div>
           </div>
 
-          <div className={styles.formGroup}>
-            <label>Password</label>
+          <div className={`${styles.formGroup} ${password ? 'filled' : ''}`}>
             <div className={styles.inputWrapper}>
-              <Lock size={18} />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Lock size={18} aria-hidden="true" />
+              <input
+                id="password"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder=" "
+                required
+                aria-required="true"
+              />
+              <label htmlFor="password">Password</label>
             </div>
           </div>
 

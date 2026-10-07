@@ -22,57 +22,67 @@ const AddPatientForm = ({ doctorId, onSuccess }) => {
   }
 
   const handleSubmit = async (e) => {
-  e.preventDefault()
-  setError('')
+    e.preventDefault()
+    setError('')
 
-  if (!formData.name || !formData.email || !formData.password) {
-    setError('Name, email and password are required')
-    return
+    if (!formData.name || !formData.email || !formData.password) {
+      setError('Name, email and password are required')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const tempPassword = formData.password
+
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        formData.email,
+        tempPassword
+      )
+
+      const uid = userCredential.user.uid
+
+      await setDoc(doc(db, 'patients', uid), {
+        uid,
+        doctorId,
+        name: formData.name,
+        email: formData.email,
+        age: formData.age ? parseInt(formData.age) : null,
+        gender: formData.gender || null,
+        medical_history: formData.medical_history || '',
+        role: 'patient',
+      })
+
+      await setDoc(doc(db, 'doctors', doctorId, 'patients', uid), {
+        patientId: uid,
+        doctorId,
+        name: formData.name,
+        email: formData.email,
+        age: formData.age ? parseInt(formData.age) : null,
+        gender: formData.gender || null,
+        medical_history: formData.medical_history || '',
+        role: 'patient',
+        linkedAt: new Date().toISOString(),
+      })
+
+      setFormData({
+        name: '',
+        email: '',
+        password: '',
+        age: '',
+        gender: '',
+        medical_history: '',
+      })
+
+      alert('✅ Patient added successfully!')
+      onSuccess()
+    } catch (err) {
+      setError(err.message || 'Failed to add patient')
+    } finally {
+      setLoading(false)
+    }
   }
-
-  setLoading(true)
-
-  try {
-    const tempPassword = formData.password
-
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      formData.email,
-      tempPassword
-    )
-
-    const uid = userCredential.user.uid
-
-    await setDoc(doc(db, 'patients', uid), {
-      uid,
-      doctorId,
-      name: formData.name,
-      email: formData.email,
-      age: formData.age ? parseInt(formData.age) : null,
-      gender: formData.gender || null,
-      medical_history: formData.medical_history || '',
-      role: 'patient',
-    })
-
-    setFormData({
-      name: '',
-      email: '',
-      password: '',
-      age: '',
-      gender: '',
-      medical_history: '',
-    })
-
-    alert(`✅ Patient added successfully!`)
-    onSuccess()
-
-  } catch (err) {
-    setError(err.message || 'Failed to add patient')
-  } finally {
-    setLoading(false)
-  }
-}
-
 
   return (
     <div className={styles.formContainer}>
@@ -104,6 +114,7 @@ const AddPatientForm = ({ doctorId, onSuccess }) => {
             required
           />
         </div>
+
         <div className={styles.formGroup}>
           <label>Password *</label>
           <input
