@@ -21,26 +21,39 @@ const PatientDetail = ({ patient, onClose, onUpdate }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch conditions
-        const condSnapshot = await getDocs(
-          query(collection(db, 'patient_conditions'), where('patientId', '==', patient.uid))
-        )
-        const condData = condSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        setConditions(condData)
+        const patientId = patient?.uid || patient?.id
+        if (!patientId) return
 
-        // Fetch reports
-        const repSnapshot = await getDocs(
-          query(collection(db, 'patient_reports'), where('patientId', '==', patient.uid))
-        )
-        const repData = repSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        setReports(repData)
+        const conditionSources = [
+          query(collection(db, 'patient_conditions'), where('patientId', '==', patientId)),
+          query(collection(db, 'patients', patientId, 'conditions')),
+        ]
+
+        const reportSources = [
+          query(collection(db, 'patient_reports'), where('patientId', '==', patientId)),
+          query(collection(db, 'patients', patientId, 'reports')),
+        ]
+
+        let allConditions = []
+        for (const source of conditionSources) {
+          const condSnapshot = await getDocs(source)
+          allConditions = [...allConditions, ...condSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))]
+        }
+        setConditions(allConditions.filter((item, idx, arr) => arr.findIndex(i => i.id === item.id) === idx))
+
+        let allReports = []
+        for (const source of reportSources) {
+          const repSnapshot = await getDocs(source)
+          allReports = [...allReports, ...repSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))]
+        }
+        setReports(allReports.filter((item, idx, arr) => arr.findIndex(i => i.id === item.id) === idx))
       } catch (error) {
         console.error('Error fetching patient details:', error)
       }
     }
 
     fetchData()
-  }, [patient.uid])
+  }, [patient])
 
   const handleAddCondition = async () => {
     if (!newCondition.diagnosis) {
@@ -50,9 +63,20 @@ const PatientDetail = ({ patient, onClose, onUpdate }) => {
 
     setLoading(true)
     try {
-      const docRef = doc(collection(db, 'patient_conditions'))
-      await setDoc(docRef, {
-        patientId: patient.uid,
+      const patientId = patient?.uid || patient?.id
+      if (!patientId) return
+
+      const topLevelRef = doc(collection(db, 'patient_conditions'))
+      await setDoc(topLevelRef, {
+        patientId,
+        doctorId: patient.doctorId,
+        ...newCondition,
+      })
+
+      const nestedRef = doc(collection(db, 'patients', patientId, 'conditions'))
+      await setDoc(nestedRef, {
+        patientId,
+        doctorId: patient.doctorId,
         ...newCondition,
       })
 
@@ -65,11 +89,10 @@ const PatientDetail = ({ patient, onClose, onUpdate }) => {
         warning_symptoms: '',
       })
 
-      // Refresh conditions
-      const condSnapshot = await getDocs(
-        query(collection(db, 'patient_conditions'), where('patientId', '==', patient.uid))
-      )
-      setConditions(condSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+      const condSnapshot = await getDocs(query(collection(db, 'patient_conditions'), where('patientId', '==', patientId)))
+      const nestedCondSnapshot = await getDocs(collection(db, 'patients', patientId, 'conditions'))
+      const merged = [...condSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })), ...nestedCondSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))]
+      setConditions(merged.filter((item, idx, arr) => arr.findIndex(i => i.id === item.id) === idx))
       onUpdate()
     } catch (error) {
       console.error('Error adding condition:', error)
@@ -97,14 +120,16 @@ const PatientDetail = ({ patient, onClose, onUpdate }) => {
 
     setLoading(true)
     try {
-      const fileRef = ref(storage, `patient_reports/${patient.uid}/${Date.now()}-${file.name}`)
+      const patientId = patient?.uid || patient?.id
+      if (!patientId) return
+
+      const fileRef = ref(storage, `patient_reports/${patientId}/${Date.now()}-${file.name}`)
       await uploadBytes(fileRef, file)
       const fileUrl = await getDownloadURL(fileRef)
 
-      // Save metadata in Firestore
-      const docRef = doc(collection(db, 'patient_reports'))
-      await setDoc(docRef, {
-        patientId: patient.uid,
+      const topLevelRef = doc(collection(db, 'patient_reports'))
+      await setDoc(topLevelRef, {
+        patientId,
         doctorId: patient.doctorId,
         reportType: file.type,
         reportName: file.name,
@@ -112,11 +137,20 @@ const PatientDetail = ({ patient, onClose, onUpdate }) => {
         uploadDate: new Date(),
       })
 
-      // Refresh reports
-      const repSnapshot = await getDocs(
-        query(collection(db, 'patient_reports'), where('patientId', '==', patient.uid))
-      )
-      setReports(repSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })))
+      const nestedRef = doc(collection(db, 'patients', patientId, 'reports'))
+      await setDoc(nestedRef, {
+        patientId,
+        doctorId: patient.doctorId,
+        reportType: file.type,
+        reportName: file.name,
+        fileUrl,
+        uploadDate: new Date(),
+      })
+
+      const repSnapshot = await getDocs(query(collection(db, 'patient_reports'), where('patientId', '==', patientId)))
+      const nestedRepSnapshot = await getDocs(collection(db, 'patients', patientId, 'reports'))
+      const merged = [...repSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })), ...nestedRepSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))]
+      setReports(merged.filter((item, idx, arr) => arr.findIndex(i => i.id === item.id) === idx))
       onUpdate()
     } catch (error) {
       console.error('Error uploading file:', error)
@@ -215,23 +249,12 @@ const PatientDetail = ({ patient, onClose, onUpdate }) => {
             <div className={styles.reportsList}>
               {reports.map(report => (
                 <div key={report.id} className={styles.reportItem}>
-                  <p>{report.reportName}</p>
+                  <p>{report.reportName || report.report_name}</p>
                   <small>{report.uploadDate?.toDate ? report.uploadDate.toDate().toLocaleDateString() : new Date(report.uploadDate).toLocaleDateString()}</small>
                 </div>
               ))}
             </div>
-
-            <div className={styles.uploadSection}>
-              <label className={styles.uploadLabel}>
-                <input
-                  type="file"
-                  onChange={handleFileUpload}
-                  disabled={loading}
-                  style={{ display: 'none' }}
-                />
-                <span>Upload Medical Report</span>
-              </label>
-            </div>
+            <input type="file" onChange={handleFileUpload} />
           </section>
         </div>
       </div>
