@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useContext } from 'react'
 import { AuthContext } from '../../contexts/AuthContext'
-import { doc, getDoc, getDocs, collection } from 'firebase/firestore'
 import { LogOut, MessageCircle, FileText } from 'lucide-react'
 import styles from './Patient.module.css'
 import ChatInterface from './ChatInterface'
 import PatientInfo from './PatientInfo'
-import { db } from '../../firebaseConfig'
+import { getPatientDetails } from '../../lib/api'
 
 const PatientDashboard = () => {
   const { userData: user, loading: authLoading, logout } = useContext(AuthContext)
@@ -20,31 +19,11 @@ const PatientDashboard = () => {
       if (!user) return
 
       try {
-        setLoading(true)
-
-        // Fetch patient document by uid
-        const patientRef = doc(db, 'patients', user.uid)
-        const patientSnap = await getDoc(patientRef)
-
-        if (!patientSnap.exists()) {
-          setPatientData(null)
-          return
-        }
-
-        const patient = patientSnap.data()
-        setPatientData({ id: user.uid, ...patient })
-
-        // Fetch patient conditions (subcollection)
-        const condCol = collection(db, 'patients', user.uid, 'conditions')
-        const condSnap = await getDocs(condCol)
-        const condData = condSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        setConditions(condData)
-
-        // Fetch patient reports (subcollection)
-        const repCol = collection(db, 'patients', user.uid, 'reports')
-        const repSnap = await getDocs(repCol)
-        const repData = repSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-        setReports(repData)
+        // Fetch profile, conditions and reports from the backend
+        const { conditions, reports, ...patient } = await getPatientDetails(user.uid)
+        setPatientData(patient)
+        setConditions(conditions)
+        setReports(reports)
       } catch (error) {
         console.error('Error fetching patient data:', error)
         setPatientData(null)
@@ -56,11 +35,12 @@ const PatientDashboard = () => {
     if (!authLoading && user) {
       fetchPatientData()
     }
-  }, [authLoading, user])
+    // Re-run on tab change so questions and doctor replies stay up to date
+  }, [authLoading, user, activeTab])
 
   const handleLogout = async () => {
     await logout()
-    window.location.href = '/login'
+    window.location.href = '/'
   }
 
   // Wait for authentication first
@@ -121,6 +101,7 @@ const PatientDashboard = () => {
             patientData={patientData}
             conditions={conditions}
             reports={reports}
+            questions={patientData.questions}
           />
         )}
       </main>

@@ -1,61 +1,26 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState } from 'react'
 import { Edit2, Trash2, ChevronDown } from 'lucide-react'
-import { db } from '../../firebaseConfig'
-import { collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore'
+import { deletePatient } from '../../lib/api'
 import styles from './Doctor.module.css'
 import PatientDetail from './PatientDetail'
 
-const PatientList = ({ doctorId, onUpdate, patients: patientsProp }) => {
-  const [patients, setPatients] = useState(patientsProp || [])
+const openQuestions = (patient) => (patient.questions || []).filter(q => !q.resolved)
+
+// The dashboard owns the patient list; onUpdate asks it to reload from the backend
+const PatientList = ({ patients, onUpdate }) => {
   const [expandedPatient, setExpandedPatient] = useState(null)
   const [editingPatient, setEditingPatient] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  // Fetch patients for this doctor
-  const fetchPatients = useCallback(async () => {
-    setLoading(true)
-    try {
-      const q = query(collection(db, 'patients'), where('doctorId', '==', doctorId))
-      const snapshot = await getDocs(q)
-      const patientData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-      setPatients(patientData)
-    } catch (err) {
-      console.error('Error fetching patients:', err)
-    } finally {
-      setLoading(false)
-    }
-  }, [doctorId])
-
-  useEffect(() => {
-    if (patientsProp && Array.isArray(patientsProp)) {
-      // If parent passed patients, use them and skip fetching
-      setPatients(patientsProp)
-      setLoading(false)
-      return
-    }
-
-    if (doctorId) {
-      fetchPatients()
-    } else {
-      setLoading(false)
-    }
-  }, [doctorId, fetchPatients, patientsProp])
 
   const handleDelete = async (patientId) => {
     if (window.confirm('Are you sure you want to delete this patient?')) {
       try {
-        await deleteDoc(doc(db, 'patients', patientId))
-        fetchPatients()
+        await deletePatient(patientId)
         onUpdate()
       } catch (error) {
         console.error('Error deleting patient:', error)
         alert('Failed to delete patient')
       }
     }
-  }
-
-  if (loading) {
-    return <div className={styles.loading}>Loading patients...</div>
   }
 
   if (patients.length === 0) {
@@ -72,7 +37,7 @@ const PatientList = ({ doctorId, onUpdate, patients: patientsProp }) => {
         <PatientDetail
           patient={editingPatient}
           onClose={() => setEditingPatient(null)}
-          onUpdate={fetchPatients}
+          onUpdate={onUpdate}
         />
       )}
 
@@ -95,6 +60,19 @@ const PatientList = ({ doctorId, onUpdate, patients: patientsProp }) => {
             <div className={styles.cardMeta}>
               <span className={styles.badge}>{patient.age || 'N/A'} years</span>
               <span className={styles.badge}>{patient.gender || 'N/A'}</span>
+              {openQuestions(patient).some(q => q.urgent) && (
+                <span className={`${styles.badge} ${styles.badgeUrgent}`}>Urgent symptom reported</span>
+              )}
+              {openQuestions(patient).length > 0 && (
+                <span className={`${styles.badge} ${styles.badgeInfo}`}>
+                  {openQuestions(patient).length} open question{openQuestions(patient).length > 1 ? 's' : ''}
+                </span>
+              )}
+              {patient.checkins?.[0] && (
+                <span className={`${styles.badge} ${patient.checkins[0].feeling === 'worse' ? styles.badgeUrgent : ''}`}>
+                  Last check-in: {patient.checkins[0].feeling === 'same' ? 'about the same' : patient.checkins[0].feeling}
+                </span>
+              )}
             </div>
 
             {expandedPatient === patient.id && (

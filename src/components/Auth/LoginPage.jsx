@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
-import { Mail, Lock, Loader } from "lucide-react";
+import { Mail, Lock, Loader, ArrowLeft } from "lucide-react";
 import styles from "./AuthPages.module.css";
 
 const LoginPage = () => {
@@ -30,7 +30,9 @@ const LoginPage = () => {
 
     const role = (userData.role || "").toLowerCase();
 
-    if (role === "doctor") {
+    if (role === "admin") {
+      navigate("/admin/dashboard");
+    } else if (role === "doctor") {
       navigate("/doctor/dashboard");
     } else if (role === "patient") {
       navigate("/patient/dashboard");
@@ -49,6 +51,10 @@ const LoginPage = () => {
 
   return (
     <div className={styles.authContainer}>
+      <Link to="/" className={styles.backLink}>
+        <ArrowLeft size={16} /> Back to home
+      </Link>
+
       <div className={styles.authCard}>
         <div className={styles.header}>
           <h1>Welcome Back</h1>
@@ -98,7 +104,10 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <p>Don't have an account? <a href="/signup">Sign Up</a></p>
+        <p>
+          No account yet? Patients get their sign-in details from their doctor,
+          and doctors from their clinic's administrator.
+        </p>
       </div>
     </div>
   );
