@@ -24,8 +24,8 @@ try:
         try:
             test_message = "Hello, can you tell me what 2+2 equals?"
             print(f"Query: {test_message}")
-            response = chat_with_gemini("test_patient_123", test_message)
-            print(f"Response: {response}")
+            response = chat_with_gemini({"name": "Test Patient"}, test_message)
+            print(f"Response: {response["reply"]}")
             print("✓ Test 1 passed!")
         except Exception as e:
             print(f"✗ Test 1 failed: {e}")

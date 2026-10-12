@@ -1,3 +1,42 @@
+/* Design tokens: warm cream surfaces, sage green accents, serif headings, soft organic shapes */
+:root {
+  --ink-strong: #262b24;
+  --ink: #343a32;
+  --primary: #76896c;
+  --primary-dark: #5f7257;
+  --accent: #6b7f61;
+  --accent-soft: #a9b9a0;
+  --muted: #6d7167;
+  --faint: #a2a59b;
+  --surface-50: #faf7f1;
+  --surface-100: #f4eee4;
+  --surface-200: #ebe1d1;
+  --surface-300: #dcc9ae;
+  --surface-alt: #f1f3ec;
+  --line: #e8e1d4;
+  --white: #ffffff;
+  --danger: #a8402f;
+  --danger-bg: #fbeeea;
+  --danger-line: #edc3b9;
+
+  --radius-sm: 12px;
+  --radius-md: 18px;
+  --radius-lg: 26px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 16px 36px rgba(62, 52, 34, 0.07), 0 2px 6px rgba(62, 52, 34, 0.04);
+  --shadow-lift: 0 22px 46px rgba(62, 52, 34, 0.13);
+
+  --font-display: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Soft organic shapes used as decoration */
+  --blob: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath fill='%2391a388' fill-opacity='.34' d='M47,-58C61,-47,73,-33,78,-16C83,1,81,21,71,37C61,53,44,65,25,72C6,79,-15,81,-33,74C-51,67,-66,51,-74,32C-82,13,-83,-9,-75,-27C-67,-45,-50,-59,-32,-68C-14,-77,5,-81,22,-76C39,-71,33,-69,47,-58Z' transform='translate(100 100)'/%3E%3C/svg%3E");
+  --blob-tan: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath fill='%23dcc9ae' fill-opacity='.55' d='M47,-58C61,-47,73,-33,78,-16C83,1,81,21,71,37C61,53,44,65,25,72C6,79,-15,81,-33,74C-51,67,-66,51,-74,32C-82,13,-83,-9,-75,-27C-67,-45,-50,-59,-32,-68C-14,-77,5,-81,22,-76C39,-71,33,-69,47,-58Z' transform='translate(100 100)'/%3E%3C/svg%3E");
+  /* Layered sage, tan and cream waves for the bottom edge of hero areas */
+  --waves: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 120' preserveAspectRatio='none'%3E%3Cpath d='M0,58 C220,8 470,6 720,52 C960,96 1210,92 1440,40 L1440,120 L0,120 Z' fill='%2391a388'/%3E%3Cpath d='M0,86 C260,40 520,44 800,82 C1040,114 1260,100 1440,66 L1440,120 L0,120 Z' fill='%23dcc9ae'/%3E%3Cpath d='M0,108 C300,66 620,74 900,100 C1120,120 1300,104 1440,90 L1440,120 L0,120 Z' fill='%23faf7f1'/%3E%3C/svg%3E");
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -9,13 +48,19 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
-  color: #1e293b;
+  background-color: var(--surface-50);
+  color: var(--ink);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 a {
@@ -36,7 +81,7 @@ select {
 }
 
 code {
-  background-color: #f1f5f9;
+  background-color: var(--surface-alt);
   border-radius: 4px;
   padding: 2px 6px;
   font-size: 0.9em;
@@ -48,14 +93,14 @@ code {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f5f9;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: #d9cfbd;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--accent-soft);
 }

@@ -5,3 +5,5 @@ python-dotenv
 google-genai
 requests
 python-multipart
+firebase-admin
+psycopg2-binary
