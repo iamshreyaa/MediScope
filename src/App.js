@@ -10,9 +10,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 
 // Pages
 import LoginPage from "./components/Auth/LoginPage";
-import SignupPage from "./components/Auth/SignupPage";
 import DoctorDashboard from "./components/Doctor/DoctorDashboard";
 import PatientDashboard from "./components/Patient/PatientDashboard";
+import LandingPage from "./components/Landing/LandingPage";
+import AdminDashboard from "./components/Admin/AdminDashboard";
 
 function App() {
   return (
@@ -21,13 +22,12 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
 
           {/* Protected Routes */}
           <Route
             path="/doctor/dashboard"
             element={
-              <ProtectedRoute requiredRole="doctor">
+              <ProtectedRoute role="doctor">
                 <DoctorDashboard />
               </ProtectedRoute>
             }
@@ -36,14 +36,26 @@ function App() {
           <Route
             path="/patient/dashboard"
             element={
-              <ProtectedRoute requiredRole="patient">
+              <ProtectedRoute role="patient">
                 <PatientDashboard />
               </ProtectedRoute>
             }
           />
 
-          {/* Default Route → Redirect to Login */}
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedRoute role="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Front page, shown before login */}
+          <Route path="/" element={<LandingPage />} />
+
+          {/* Anything else (such as the old signup link) goes to the front page */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
     </Router>

@@ -1,8 +1,9 @@
 import React from 'react'
 import { AlertCircle, Pill, TrendingUp, Heart } from 'lucide-react'
+import { openReportFile } from '../../lib/api'
 import styles from './Patient.module.css'
 
-const PatientInfo = ({ patientData, conditions, reports }) => {
+const PatientInfo = ({ patientData, conditions, reports, questions = [] }) => {
   return (
     <div className={styles.infoContainer}>
       {/* Personal Information */}
@@ -79,6 +80,13 @@ const PatientInfo = ({ patientData, conditions, reports }) => {
                   </div>
                 )}
 
+                {condition.other_notes && (
+                  <div className={styles.cardItem}>
+                    <label>Other Comments</label>
+                    <p>{condition.other_notes}</p>
+                  </div>
+                )}
+
                 {condition.warning_symptoms && (
                   <div className={`${styles.cardItem} ${styles.warning}`}>
                     <div className={styles.warningHeader}>
@@ -93,6 +101,27 @@ const PatientInfo = ({ patientData, conditions, reports }) => {
           </div>
         )}
       </section>
+
+      {/* Questions passed on to the doctor by the health assistant */}
+      {questions.length > 0 && (
+        <section className={styles.section}>
+          <h2>Questions for Your Doctor</h2>
+          <div className={styles.reportsList}>
+            {questions.map(question => (
+              <div key={question.id} className={styles.questionItem}>
+                <p className={styles.reportName}>{question.question}</p>
+                {question.answer ? (
+                  <p className={styles.questionAnswer}><strong>Your doctor:</strong> {question.answer}</p>
+                ) : (
+                  <small className={styles.reportDate}>
+                    {question.resolved ? 'Seen by your doctor' : 'Waiting for your doctor'}
+                  </small>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Medical Reports */}
       <section className={styles.section}>
@@ -109,19 +138,16 @@ const PatientInfo = ({ patientData, conditions, reports }) => {
                 <div className={styles.reportInfo}>
                   <p className={styles.reportName}>{report.report_name}</p>
                   <small className={styles.reportDate}>
-                    Uploaded on {report.upload_date?.toDate ? report.upload_date.toDate().toLocaleDateString() : new Date(report.upload_date).toLocaleDateString()}
+                    Uploaded on {new Date(report.upload_date).toLocaleDateString()}
                   </small>
                 </div>
-                {report.file_url && (
-                  <a
-                    href={report.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={styles.downloadLink}
-                  >
-                    View
-                  </a>
-                )}
+                <button
+                  type="button"
+                  onClick={() => openReportFile(report.id)}
+                  className={styles.downloadLink}
+                >
+                  View
+                </button>
               </div>
             ))}
           </div>

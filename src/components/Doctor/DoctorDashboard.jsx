@@ -1,82 +1,58 @@
-import React, { useState, useEffect, useContext } from "react";
-import { AuthContext } from "../../contexts/AuthContext";
-import { getAuth } from "firebase/auth";
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "../../firebaseConfig";
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../../contexts/AuthContext";
+import { getMyPatients } from "../../lib/api";
 
-import { Plus, LogOut, Users } from "lucide-react";
+import { Plus, LogOut, Users, MessageCircleQuestion, AlertTriangle, CalendarCheck } from "lucide-react";
 import PatientList from "./PatientList";
 import AddPatientForm from "./AddPatientForm";
 import styles from "./Doctor.module.css";
-import { signOut } from "firebase/auth";
-
-const API_BASE = "http://127.0.0.1:8000";
 
 export default function DoctorDashboard() {
-  
-  const auth = getAuth();
+  // The doctor's profile comes from the backend via AuthContext
+  const { userData: doctorInfo, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState("patients");
-  const [doctorInfo, setDoctorInfo] = useState(null);
   const [patients, setPatients] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // 🔹 Fetch doctor's own Firestore profile
-  const fetchDoctorProfile = async (user) => {
-    const q = query(collection(db, "doctors"), where("uid", "==", user.uid));
-    const snapshot = await getDocs(q);
-
-    if (!snapshot.empty) {
-      const doc = snapshot.docs[0];
-      setDoctorInfo({ id: doc.id, ...doc.data() });
+  const fetchMyPatients = async () => {
+    try {
+      setPatients(await getMyPatients());
+    } catch (error) {
+      console.error("Failed to fetch doctor patients:", error);
+      setPatients([]);
     }
   };
 
-  // 🔹 Fetch patients linked to this doctor
-  const fetchMyPatients = async (doctorId) => {
-    const q = query(collection(db, "patients"), where("doctorId", "==", doctorId));
-    const snapshot = await getDocs(q);
-    const pts = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-    setPatients(pts);
-  };
-
   const handlePatientAdded = async () => {
-    if (!auth.currentUser) return;
-    await fetchMyPatients(auth.currentUser.uid);
+    await fetchMyPatients();
     setActiveTab("patients");
   };
 
-  
-
-const handleLogout = async () => {
-  const authInstance = getAuth();
-  await signOut(authInstance);
-  window.location.href = "/login";
-};
-
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = "/";
+  };
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (user) => {
-      if (!user) return;
-
-      await fetchDoctorProfile(user);
-      await fetchMyPatients(user.uid);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [auth]);
+    fetchMyPatients().finally(() => setLoading(false));
+  }, []);
 
   if (loading) return <div className={styles.loading}>Loading...</div>;
 
+  // Numbers for the summary row
+  const openQuestions = patients.flatMap((p) => (p.questions || []).filter((q) => !q.resolved));
+  const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const checkedIn = patients.filter((p) => p.checkins?.[0] && new Date(p.checkins[0].created_at).getTime() >= weekAgo).length;
+  const stats = [
+    { icon: Users, label: "Patients", value: patients.length },
+    { icon: MessageCircleQuestion, label: "Open questions", value: openQuestions.length },
+    { icon: AlertTriangle, label: "Urgent flags", value: openQuestions.filter((q) => q.urgent).length, urgent: true },
+    { icon: CalendarCheck, label: "Checked in this week", value: checkedIn },
+  ];
+
   return (
     <div className={styles.dashboardContainer}>
-      {/* HEADER */}
       <header className={styles.header}>
         <div className={styles.headerLeft}>
           <h1>Doctor Dashboard</h1>
@@ -95,12 +71,9 @@ const handleLogout = async () => {
         </button>
       </header>
 
-      {/* TABS */}
       <nav className={styles.tabNav}>
         <button
-          className={`${styles.tabBtn} ${
-            activeTab === "patients" ? styles.active : ""
-          }`}
+          className={`${styles.tabBtn} ${activeTab === "patients" ? styles.active : ""}`}
           onClick={() => setActiveTab("patients")}
         >
           <Users size={18} />
@@ -108,9 +81,7 @@ const handleLogout = async () => {
         </button>
 
         <button
-          className={`${styles.tabBtn} ${
-            activeTab === "add" ? styles.active : ""
-          }`}
+          className={`${styles.tabBtn} ${activeTab === "add" ? styles.active : ""}`}
           onClick={() => setActiveTab("add")}
         >
           <Plus size={18} />
@@ -118,17 +89,25 @@ const handleLogout = async () => {
         </button>
       </nav>
 
-      {/* MAIN CONTENT */}
       <main className={styles.mainContent}>
         {activeTab === "patients" && (
-          <PatientList patients={patients} />
+          <div className={styles.statGrid}>
+            {stats.map(({ icon: Icon, label, value, urgent }) => (
+              <div key={label} className={`${styles.statCard} ${urgent && value > 0 ? styles.statUrgent : ""}`}>
+                <span className={styles.statIcon}><Icon size={20} /></span>
+                <div>
+                  <p className={styles.statValue}>{value}</p>
+                  <p className={styles.statLabel}>{label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
 
+        {activeTab === "patients" && <PatientList patients={patients} onUpdate={fetchMyPatients} />}
+
         {activeTab === "add" && (
-          <AddPatientForm
-            doctorId={auth.currentUser.uid}
-            onSuccess={handlePatientAdded}
-          />
+          <AddPatientForm onSuccess={handlePatientAdded} />
         )}
       </main>
     </div>

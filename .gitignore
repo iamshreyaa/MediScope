@@ -23,3 +23,9 @@ yarn-debug.log*
 yarn-error.log*
 serviceAccountkey.json
 .env
+
+# uploaded patient reports
+backend/uploads/
+
+# python
+__pycache__/

@@ -1,7 +1,7 @@
 import React, { useState, useContext, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
-import { Mail, Lock, Loader } from "lucide-react";
+import { Mail, Lock, Loader, ArrowLeft } from "lucide-react";
 import styles from "./AuthPages.module.css";
 
 const LoginPage = () => {
@@ -30,7 +30,9 @@ const LoginPage = () => {
 
     const role = (userData.role || "").toLowerCase();
 
-    if (role === "doctor") {
+    if (role === "admin") {
+      navigate("/admin/dashboard");
+    } else if (role === "doctor") {
       navigate("/doctor/dashboard");
     } else if (role === "patient") {
       navigate("/patient/dashboard");
@@ -49,6 +51,10 @@ const LoginPage = () => {
 
   return (
     <div className={styles.authContainer}>
+      <Link to="/" className={styles.backLink}>
+        <ArrowLeft size={16} /> Back to home
+      </Link>
+
       <div className={styles.authCard}>
         <div className={styles.header}>
           <h1>Welcome Back</h1>
@@ -57,22 +63,39 @@ const LoginPage = () => {
 
         {error && <div className={styles.error}>{error}</div>}
 
-        <form onSubmit={handleSubmit} className={styles.form}>
-          
+        <form onSubmit={handleSubmit} className={styles.form} noValidate>
 
-          <div className={styles.formGroup}>
-            <label>Email</label>
+          <div className={`${styles.formGroup} ${email ? 'filled' : ''}`}>
             <div className={styles.inputWrapper}>
-              <Mail size={18} />
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Mail size={18} aria-hidden="true" />
+              <input
+                id="email"
+                name="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder=" "
+                required
+                aria-required="true"
+              />
+              <label htmlFor="email">Email</label>
             </div>
           </div>
 
-          <div className={styles.formGroup}>
-            <label>Password</label>
+          <div className={`${styles.formGroup} ${password ? 'filled' : ''}`}>
             <div className={styles.inputWrapper}>
-              <Lock size={18} />
-              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Lock size={18} aria-hidden="true" />
+              <input
+                id="password"
+                name="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder=" "
+                required
+                aria-required="true"
+              />
+              <label htmlFor="password">Password</label>
             </div>
           </div>
 
@@ -81,7 +104,10 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <p>Don't have an account? <a href="/signup">Sign Up</a></p>
+        <p>
+          No account yet? Patients get their sign-in details from their doctor,
+          and doctors from their clinic's administrator.
+        </p>
       </div>
     </div>
   );
