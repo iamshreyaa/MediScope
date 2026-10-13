@@ -25,6 +25,7 @@ class BotReply(BaseModel):
 LOOKUP_CACHE_SECONDS = 7 * 24 * 60 * 60
 
 # Fallback when Redis is not running: lookups done since the server started
+# Product lookups already done since the server started: query -> (summary, sources)
 _lookup_cache = {}
 
 
@@ -45,6 +46,8 @@ def lookup_on_web(query: str):
     cached = cache_get(f"lookup:{key}")
     if cached:
         return cached["summary"], cached["sources"]
+    """
+    key = " ".join(query.lower().split())
     if key in _lookup_cache:
         return _lookup_cache[key]
 
@@ -139,6 +142,32 @@ def build_patient_context(patient: dict) -> str:
     return context
 
 
+
+    for cond in patient.get("conditions") or []:
+        context += f"""
+    Doctor's notes for condition: {cond.get('diagnosis') or 'N/A'}
+    Description: {cond.get('description') or 'N/A'}
+    Medication Instructions: {cond.get('medication_instructions') or 'N/A'}
+    Follow-up Guidelines: {cond.get('follow_up_guidelines') or 'N/A'}
+    Lifestyle Recommendations: {cond.get('lifestyle_recommendations') or 'N/A'}
+    Warning Symptoms: {cond.get('warning_symptoms') or 'N/A'}
+    Other Comments: {cond.get('other_notes') or 'N/A'}
+    """
+
+    for question in patient.get("questions") or []:
+        if question.get("answer"):
+            context += f"""
+    Earlier question from the patient: {question.get('question')}
+    Doctor's answer: {question.get('answer')}
+    """
+        elif not question.get("resolved"):
+            context += f"""
+    Question already sent to the doctor, waiting for a reply: {question.get('question')}
+    """
+
+    return context
+
+
 def chat_with_gemini(patient: dict, prompt: str, history: Optional[List[dict]] = None, allow_web_lookup: bool = True) -> dict:
     """
     Generate a reply using Gemini with patient-specific instructions.
@@ -195,6 +224,29 @@ def chat_with_gemini(patient: dict, prompt: str, history: Optional[List[dict]] =
         if isinstance(response.parsed, BotReply):
             return response.parsed
         return BotReply.model_validate_json(response.text) if response.text else None
+
+    parsed = generate(system_instruction)
+
+    # The bot asked to look a product up: fetch the facts and let it answer again with them
+    sources = []
+    query = (parsed.web_search_query or "").strip() if parsed else ""
+    if query and allow_web_lookup:
+        lookup = lookup_on_web(query)
+        if lookup:
+            summary, sources = lookup
+            try:
+                parsed = generate(system_instruction + f"""
+    Web lookup results for "{query}" (searched online just now):
+    {summary}
+
+    Use these results in your reply: briefly say what the product is, mention the relevant
+    ingredients or properties, and then answer the patient's question from them.
+    """) or parsed
+            except Exception as e:
+                # Keep the first answer if the second call fails
+                print(f"Gemini error after web lookup: {e}")
+                sources = []
+
 
     parsed = generate(system_instruction)
 

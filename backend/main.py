@@ -223,6 +223,46 @@ async def list_my_patients(doctor: CurrentUser = Depends(require_doctor), db: Se
     return db.query(Patient).filter(Patient.doctor_id == doctor.uid).order_by(Patient.created_at.asc()).all()
 
 
+
+@app.delete("/admin/doctors/{doctor_id}")
+async def remove_doctor(doctor_id: str, admin: CurrentUser = Depends(require_admin), db: Session = Depends(get_db)):
+    """Remove a doctor and their login. Their patients and notes are kept; the patients
+    become unassigned until an admin gives them to another doctor."""
+    doctor = db.get(Doctor, doctor_id)
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
+
+    unassigned = db.query(Patient).filter(Patient.doctor_id == doctor_id).update({Patient.doctor_id: None})
+    db.query(Condition).filter(Condition.doctor_id == doctor_id).update({Condition.doctor_id: None})
+    db.query(Report).filter(Report.doctor_id == doctor_id).update({Report.doctor_id: None})
+    db.delete(doctor)
+    db.commit()
+
+    try:
+        auth_client.delete_user(doctor_id)
+    except auth_client.UserNotFoundError:
+        pass
+    return {"deleted": doctor_id, "patients_unassigned": unassigned}
+
+
+@app.post("/admin/patients/{patient_id}/assign")
+async def assign_patient(patient_id: str, body: AssignDoctor, admin: CurrentUser = Depends(require_admin), db: Session = Depends(get_db)):
+    patient = db.get(Patient, patient_id)
+    if not patient:
+        raise HTTPException(status_code=404, detail="Patient not found")
+    if not db.get(Doctor, body.doctor_id):
+        raise HTTPException(status_code=404, detail="Doctor not found")
+    patient.doctor_id = body.doctor_id
+    db.commit()
+    return {"id": patient.id, "doctor_id": patient.doctor_id}
+
+
+# ----------------- Doctor: manage patients -----------------
+@app.get("/doctor/patients", response_model=List[PatientOut])
+async def list_my_patients(doctor: CurrentUser = Depends(require_doctor), db: Session = Depends(get_db)):
+    return db.query(Patient).filter(Patient.doctor_id == doctor.uid).order_by(Patient.created_at.asc()).all()
+
+
 @app.post("/doctor/patients", response_model=PatientOut)
 async def add_patient(patient: PatientCreate, doctor: CurrentUser = Depends(require_doctor), db: Session = Depends(get_db)):
     """Create the patient's Firebase login and their profile in Postgres."""
@@ -413,6 +453,7 @@ async def chat(
     _: None = Depends(rate_limit("chat", CHAT_MESSAGES_PER_MINUTE)),
     db: Session = Depends(get_db),
 ):
+async def chat(request: ChatRequest, user: CurrentUser = Depends(require_patient), db: Session = Depends(get_db)):
     """
     Chat endpoint that generates the AI response and saves both
     messages to Postgres. Questions the bot cannot answer and urgent
@@ -563,6 +604,7 @@ async def dictate_notes(
     doctor: CurrentUser = Depends(require_doctor),
     _: None = Depends(rate_limit("dictation", DICTATIONS_PER_MINUTE)),
 ):
+async def dictate_notes(audio: UploadFile = File(...), doctor: CurrentUser = Depends(require_doctor)):
     """Turn the doctor's spoken notes into text sorted by field. Nothing is saved here;
     the doctor reviews the filled-in form and saves it as usual."""
     data = await audio.read()
