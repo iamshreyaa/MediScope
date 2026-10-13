@@ -21,7 +21,10 @@ class BotReply(BaseModel):
     web_search_query: Optional[str] = None
 
 
-# Product lookups already done since the server started: query -> (summary, sources)
+# How long a product lookup is reused before searching again
+LOOKUP_CACHE_SECONDS = 7 * 24 * 60 * 60
+
+# Fallback when Redis is not running: lookups done since the server started
 _lookup_cache = {}
 
 
@@ -32,8 +35,16 @@ def lookup_on_web(query: str):
     Only the query is sent, never any patient details. Returns (summary, sources)
     or None when the lookup fails. Uses its own model because web search is not
     available on every Gemini model.
+
+    Results are cached in Redis for a week and shared by all patients, since they
+    describe a product and contain nothing about a person.
     """
+    from backend.cache import cache_get, cache_set
+
     key = " ".join(query.lower().split())
+    cached = cache_get(f"lookup:{key}")
+    if cached:
+        return cached["summary"], cached["sources"]
     if key in _lookup_cache:
         return _lookup_cache[key]
 
@@ -72,6 +83,7 @@ def lookup_on_web(query: str):
             sources.append({"title": web.title or web.uri, "url": web.uri})
 
     _lookup_cache[key] = (summary, sources[:4])
+    cache_set(f"lookup:{key}", {"summary": summary, "sources": sources[:4]}, LOOKUP_CACHE_SECONDS)
     return _lookup_cache[key]
 
 

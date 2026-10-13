@@ -33,6 +33,7 @@ from backend.schemas import (
     ReportUpdate,
 )
 from backend.auth import CurrentUser, get_current_user, require_admin, require_doctor, require_patient
+from backend.cache import rate_limit
 from backend.firebase import auth_client
 from backend.gemini_client import chat_with_gemini, sort_dictation
 
@@ -54,6 +55,10 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 UPLOAD_DIR = Path(__file__).parent / "uploads"
+
+# Per-user limits on the endpoints that call Gemini, to protect the API quota
+CHAT_MESSAGES_PER_MINUTE = 20
+DICTATIONS_PER_MINUTE = 6
 
 # Largest voice recording accepted for dictation (a few minutes of speech)
 MAX_DICTATION_BYTES = 15 * 1024 * 1024
@@ -402,7 +407,12 @@ async def download_report(report_id: int, user: CurrentUser = Depends(get_curren
 
 #Chat endpoint
 @app.post("/chat")
-async def chat(request: ChatRequest, user: CurrentUser = Depends(require_patient), db: Session = Depends(get_db)):
+async def chat(
+    request: ChatRequest,
+    user: CurrentUser = Depends(require_patient),
+    _: None = Depends(rate_limit("chat", CHAT_MESSAGES_PER_MINUTE)),
+    db: Session = Depends(get_db),
+):
     """
     Chat endpoint that generates the AI response and saves both
     messages to Postgres. Questions the bot cannot answer and urgent
@@ -548,7 +558,11 @@ async def submit_checkin(checkin: CheckInCreate, user: CurrentUser = Depends(req
 
 # ----------------- Voice dictation of notes -----------------
 @app.post("/dictation")
-async def dictate_notes(audio: UploadFile = File(...), doctor: CurrentUser = Depends(require_doctor)):
+async def dictate_notes(
+    audio: UploadFile = File(...),
+    doctor: CurrentUser = Depends(require_doctor),
+    _: None = Depends(rate_limit("dictation", DICTATIONS_PER_MINUTE)),
+):
     """Turn the doctor's spoken notes into text sorted by field. Nothing is saved here;
     the doctor reviews the filled-in form and saves it as usual."""
     data = await audio.read()

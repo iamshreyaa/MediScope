@@ -112,6 +112,7 @@ flowchart LR
 - **All application data lives in PostgreSQL**: admins, doctors, patients, conditions, reports, chat messages, questions for the doctor and check-ins.
 - **Access is enforced on the server.** A patient can reach only their own data, a doctor only their own patients, and an admin only account management.
 - **Report files** are stored on the backend's disk and served only to the patient or their doctor.
+- **Redis** caches online product lookups for a week (shared by all patients, since they contain nothing personal) and rate-limits the endpoints that call Gemini, per user. The assistant's answers are deliberately **not** cached: they depend on each patient's notes, and a stale answer about a medicine would be unsafe. If Redis is not running, the app carries on without the cache or the limits.
 
 ### Tech stack
 
@@ -121,6 +122,7 @@ flowchart LR
 | Backend | Python, FastAPI, SQLAlchemy, Pydantic |
 | Database | PostgreSQL |
 | Authentication | Firebase Authentication (email and password) |
+| Cache and rate limiting | Redis (optional) |
 | AI | Google Gemini via `google-genai` (structured output, Google Search grounding, audio input) |
 
 ### Project layout
@@ -131,6 +133,7 @@ backend/
   auth.py                 token verification and role checks
   models.py, schemas.py   database tables and request/response shapes
   gemini_client.py        chat, web lookup and voice dictation
+  cache.py                Redis cache and per-user rate limiter
   prompConfig.py          the assistant's rules
   create_admin.py         creates an admin account
   evals/                  evaluation suite, cases and results
@@ -152,6 +155,7 @@ src/
 - PostgreSQL 14 or newer
 - A Firebase project with **Email/Password** sign-in enabled, and a service account key for it
 - A Google Gemini API key
+- Redis (optional, for caching and rate limiting): `brew install redis && brew services start redis`
 
 ### 1. Backend
 

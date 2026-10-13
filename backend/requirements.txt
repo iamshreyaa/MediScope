@@ -7,3 +7,4 @@ requests
 python-multipart
 firebase-admin
 psycopg2-binary
+redis
